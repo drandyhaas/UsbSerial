@@ -19,6 +19,7 @@ import android.widget.Toast;
 
 import java.lang.ref.WeakReference;
 import java.math.BigInteger;
+import java.util.Formatter;
 import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
@@ -83,7 +84,7 @@ public class MainActivity extends AppCompatActivity {
                     if (usbService != null) { // if UsbService was correctly binded, Send data
                         display.append(data+"\n");
                         int x = Integer.parseInt(data);
-                        if (x>127) {x-=256;}
+                        if (x>127) x -= 256; // since it goes to bytes as twos compliment
                         usbService.write( BigInteger.valueOf(x).toByteArray() );
                     }
                 }
@@ -145,8 +146,14 @@ public class MainActivity extends AppCompatActivity {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case UsbService.MESSAGE_FROM_SERIAL_PORT:
-                    String data = (String) msg.obj;
-                    mActivity.get().display.append(data);
+                    Formatter formatter = new Formatter();
+                    byte [] bd = (byte[])msg.obj;
+                    for (byte b : bd) {
+                        formatter.format("%02x", b);
+                    }
+                    String data = formatter.toString();
+                    if (data.length()>40) data = data.substring(0,40);
+                    mActivity.get().display.append(data+"\n");
                     break;
                 case UsbService.CTS_CHANGE:
                     Toast.makeText(mActivity.get(), "CTS_CHANGE",Toast.LENGTH_LONG).show();
