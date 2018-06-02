@@ -18,6 +18,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.lang.ref.WeakReference;
+import java.math.BigInteger;
 import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
@@ -80,7 +81,10 @@ public class MainActivity extends AppCompatActivity {
                 if (!editText.getText().toString().equals("")) {
                     String data = editText.getText().toString();
                     if (usbService != null) { // if UsbService was correctly binded, Send data
-                        usbService.write(data.getBytes());
+                        display.append(data+"\n");
+                        int x = Integer.parseInt(data);
+                        if (x>127) {x-=256;}
+                        usbService.write( BigInteger.valueOf(x).toByteArray() );
                     }
                 }
             }
