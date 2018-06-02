@@ -64,7 +64,7 @@ public class CH34xSerialDevice extends UsbSerialDevice
 
     private static final int CH34X_460800_1312 = 0xf383;
 
-    private static final int CH34X_921600_1312 = 0xf387;
+    private static final int CH34X_921600_1312 = 0xd982;//0xf387;
 
     // Parity values
     private static final int CH34X_PARITY_NONE = 0xc3;
