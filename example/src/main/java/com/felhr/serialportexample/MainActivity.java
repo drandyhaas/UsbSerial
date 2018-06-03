@@ -59,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
     private MyHandler mHandler;
     LineGraphSeries<DataPoint> series;
     GraphView graph;
-    private int numsamples = 250;
+    private int numsamples = 200; // <256 please
 
     private final ServiceConnection usbConnection = new ServiceConnection() {
         @Override
@@ -117,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
                         send2usb(0); send2usb(20); // board ID 0
                         send2usb(30); send2usb(142); // get board ID
                         waitalittle();
-                        send2usb(135); send2usb(1); send2usb(100); // serialdelaytimerwait of 200
+                        send2usb(135); send2usb(2); send2usb(0); // serialdelaytimerwait of 512
 
                         waitalittle(); send2usb(139); // auto-rearm trigger
                         send2usb(100);//final arming
@@ -130,17 +130,19 @@ public class MainActivity extends AppCompatActivity {
                         send2usb(125); send2usb(1); // tickstowait 1
 
                         //100, 10 // get event (or just 10 if auto-rearming)
-                        //136, 2, 32, 0, 0, 255, 200 // io expanders on
-                        waitalittle(); send2usb(136); send2usb(2); send2usb(32); send2usb(1); send2usb(0); send2usb(255); send2usb(200);// io expanders on (!)
-                        //136, 2, 33, 0, 0, 255, 200 // io expanders on
-                        //136, 2, 33, 1, 0, 255, 200 // io expanders on
-                        //136, 2, 32, 18, 240, 255, 200 // init
+
+                        waitalittle(); send2usb(136); send2usb(2); send2usb(32); send2usb(0); send2usb(0); send2usb(255); send2usb(200);// io expanders on
+                        waitalittle(); send2usb(136); send2usb(2); send2usb(32); send2usb(1); send2usb(0); send2usb(255); send2usb(200);// io expanders on
+                        waitalittle(); send2usb(136); send2usb(2); send2usb(33); send2usb(0); send2usb(0); send2usb(255); send2usb(200);// io expanders on
+                        waitalittle(); send2usb(136); send2usb(2); send2usb(33); send2usb(1); send2usb(0); send2usb(255); send2usb(200);// io expanders on
+                        waitalittle(); send2usb(136); send2usb(2); send2usb(32); send2usb(18); send2usb(240); send2usb(255); send2usb(200);// init, and turn on ADCs!
                         waitalittle(); send2usb(136); send2usb(2); send2usb(32); send2usb(19); send2usb(15); send2usb(255); send2usb(200);// init, and turn on ADCs!
-                        //136, 2, 33, 18, 0, 255, 200 // init
-                        //136, 2, 33, 19, 0, 255, 200 // init
+                        waitalittle(); send2usb(136); send2usb(2); send2usb(33); send2usb(18); send2usb(0); send2usb(255); send2usb(200);// init, and turn on ADCs!
+                        waitalittle(); send2usb(136); send2usb(2); send2usb(33); send2usb(19); send2usb(0); send2usb(255); send2usb(200);// init, and turn on ADCs!
+
                         waitalittle(); send2usb(131);  send2usb(8); send2usb(0); // spi offset
-                        //waitalittle(); send2usb(131);  send2usb(6); send2usb(16); // spi offset binary output
-                        waitalittle(); send2usb(131);  send2usb(6); send2usb(80); // spi offset binary output - test pattern
+                        waitalittle(); send2usb(131);  send2usb(6); send2usb(16); // spi offset binary output
+                        //waitalittle(); send2usb(131);  send2usb(6); send2usb(80); // spi offset binary output - test pattern
                         waitalittle(); send2usb(131);  send2usb(1); send2usb(0 ); // spi not multiplexed output
                         waitalittle(); send2usb(136); send2usb(3); send2usb(96); send2usb(80); send2usb(136); send2usb(22); send2usb(0); // board 0 calib
                         waitalittle();
