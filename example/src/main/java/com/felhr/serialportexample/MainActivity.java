@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -57,7 +58,10 @@ public class MainActivity extends AppCompatActivity {
     private TextView display;
     private EditText editText;
     private MyHandler mHandler;
-    LineGraphSeries<DataPoint> series;
+    LineGraphSeries<DataPoint> _series0;
+    LineGraphSeries<DataPoint> _series1;
+    LineGraphSeries<DataPoint> _series2;
+    LineGraphSeries<DataPoint> _series3;
     GraphView graph;
     private int numsamples = 20; // <256 please
 
@@ -92,15 +96,62 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        int radius = 6;
+        int thickness = 4;
+
         graph = (GraphView) findViewById(R.id.graph);
-        series = new LineGraphSeries<DataPoint>(new DataPoint[] {
+        _series0 = new LineGraphSeries<DataPoint>(new DataPoint[] {
                 new DataPoint(0, 1),
                 new DataPoint(1, 5),
                 new DataPoint(2, 3),
                 new DataPoint(3, 2),
                 new DataPoint(4, 6)
         });
-        graph.addSeries(series);
+        _series0.setTitle("Chan 0");
+        _series0.setColor(Color.RED);
+        _series0.setDrawDataPoints(true);
+        _series0.setDataPointsRadius(radius);
+        _series0.setThickness(thickness);
+        graph.addSeries(_series0);
+        _series1 = new LineGraphSeries<DataPoint>(new DataPoint[] {
+                new DataPoint(0, 2),
+                new DataPoint(1, 6),
+                new DataPoint(2, 4),
+                new DataPoint(3, 0),
+                new DataPoint(4, 0)
+        });
+        _series1.setTitle("Chan 1");
+        _series1.setColor(Color.GREEN);
+        _series1.setDrawDataPoints(true);
+        _series1.setDataPointsRadius(radius);
+        _series1.setThickness(thickness);
+        graph.addSeries(_series1);
+        _series2 = new LineGraphSeries<DataPoint>(new DataPoint[] {
+                new DataPoint(0, 9),
+                new DataPoint(1, 2),
+                new DataPoint(2, 3),
+                new DataPoint(3, -1),
+                new DataPoint(4, -2)
+        });
+        _series2.setTitle("Chan 2");
+        _series2.setColor(Color.BLUE);
+        _series2.setDrawDataPoints(true);
+        _series2.setDataPointsRadius(radius);
+        _series2.setThickness(thickness);
+        graph.addSeries(_series2);
+        _series3 = new LineGraphSeries<DataPoint>(new DataPoint[] {
+                new DataPoint(0, -3),
+                new DataPoint(1, -5),
+                new DataPoint(2, -3),
+                new DataPoint(3, -2),
+                new DataPoint(4, -1)
+        });
+        _series3.setTitle("Chan 3");
+        _series3.setColor(Color.MAGENTA);
+        _series3.setDrawDataPoints(true);
+        _series3.setDataPointsRadius(radius);
+        _series3.setThickness(thickness);
+        graph.addSeries(_series3);
 
         mHandler = new MyHandler(this);
 
@@ -112,7 +163,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 String data = editText.getText().toString();
                 if (!data.equals("")) {
-                    if (data.equals("I")){
+                    if (data.equals("I") || data.equals("i")){
                         waitalittle();
                         send2usb(0); send2usb(20); // board ID 0
                         send2usb(30); send2usb(142); // get board ID
@@ -153,7 +204,11 @@ public class MainActivity extends AppCompatActivity {
                         waitalittle();
                         display.append("sent initialization commands \n");
                     }
-                    else if (usbService != null) { // if UsbService was correctly binded, Send data
+                    else if (data.equals("G") || data.equals("g")){
+                        //send2usb(100); // arm trigger
+                        send2usb(10); // get an event
+                    }
+                    else if (usbService != null) { // if UsbService was correctly bound, send data
                         display.append(data+"\n");
                         send2usb(Integer.parseInt(data));
                     }
@@ -220,6 +275,8 @@ public class MainActivity extends AppCompatActivity {
                     byte [] bd = (byte[])msg.obj;
                     int histlen=bd.length/4;
                     double xoffset = 1.0;
+                    int yoffset=0;
+                    double yscale = 7.5;
                     DataPoint [] series0 = new DataPoint[histlen];
                     DataPoint [] series1 = new DataPoint[histlen];
                     DataPoint [] series2 = new DataPoint[histlen];
@@ -231,19 +288,26 @@ public class MainActivity extends AppCompatActivity {
                         //convert to unsigned, then subtract 128
                         if (bdp < 0) bdp += 256;
                         bdp -= 128;
-                        if (p<histlen) series0[p] = new DataPoint(p+xoffset, bdp);
-                        else if (p<2*histlen) series1[p-histlen] = new DataPoint(p-histlen+xoffset, bdp);
-                        else if (p<3*histlen) series2[p-2*histlen] = new DataPoint(p-2*histlen+xoffset, bdp);
-                        else if (p<4*histlen) series3[p-3*histlen] = new DataPoint(p-3*histlen+xoffset, bdp);
+                        double yval=(yoffset-bdp)*(yscale/256.); // got to flip it, since it's a negative feedback op amp
+                        if (p<histlen) series0[p] = new DataPoint(p+xoffset, yval);
+                        else if (p<2*histlen) series1[p-histlen] = new DataPoint(p-histlen+xoffset, yval);
+                        else if (p<3*histlen) series2[p-2*histlen] = new DataPoint(p-2*histlen+xoffset, yval);
+                        else if (p<4*histlen) series3[p-3*histlen] = new DataPoint(p-3*histlen+xoffset, yval);
                         else break;
                         p++;
                     }
                     mActivity.get().display.append(formatter.toString()+" - "+String.valueOf(histlen)+" -\n");
                     if (p>numsamples-2) {
-                        series.resetData(series0);
+                        _series0.resetData(series0);
+                        _series1.resetData(series1);
+                        _series2.resetData(series2);
+                        _series3.resetData(series3);
                         graph.getViewport().setMinX(xoffset);
                         graph.getViewport().setMaxX(numsamples-1+xoffset);
                         graph.getViewport().setXAxisBoundsManual(true);
+                        graph.getViewport().setMinY(-yscale*1.1/2.);
+                        graph.getViewport().setMaxY(yscale*1.1/2.);
+                        graph.getViewport().setYAxisBoundsManual(true);
                     }
 
                     break;
