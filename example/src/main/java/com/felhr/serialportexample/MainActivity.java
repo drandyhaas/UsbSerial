@@ -63,7 +63,8 @@ public class MainActivity extends AppCompatActivity {
     LineGraphSeries<DataPoint> _series2;
     LineGraphSeries<DataPoint> _series3;
     GraphView graph;
-    private int numsamples = 20; // <256 please
+    private int numsamples = 70; // <256 please
+    private int eventn = 0;
 
     private final ServiceConnection usbConnection = new ServiceConnection() {
         @Override
@@ -163,7 +164,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 String data = editText.getText().toString();
                 if (!data.equals("")) {
-                    if (data.equals("I") || data.equals("i")){
+                    if (data.equals("G") || data.equals("g")){
                         waitalittle();
                         send2usb(0); send2usb(20); // board ID 0
                         send2usb(30); send2usb(142); // get board ID
@@ -203,9 +204,7 @@ public class MainActivity extends AppCompatActivity {
 
                         waitalittle();
                         display.append("sent initialization commands \n");
-                    }
-                    else if (data.equals("G") || data.equals("g")){
-                        //send2usb(100); // arm trigger
+                        waitalittle();
                         send2usb(10); // get an event
                     }
                     else if (usbService != null) { // if UsbService was correctly bound, send data
@@ -283,7 +282,7 @@ public class MainActivity extends AppCompatActivity {
                     DataPoint [] series3 = new DataPoint[histlen];
                     int p=0;
                     for (byte b : bd) {
-                        formatter.format("%02x ", b);
+                        //formatter.format("%02x ", b); // for debugging
                         int bdp = bd[p];
                         //convert to unsigned, then subtract 128
                         if (bdp < 0) bdp += 256;
@@ -296,7 +295,8 @@ public class MainActivity extends AppCompatActivity {
                         else break;
                         p++;
                     }
-                    mActivity.get().display.append(formatter.toString()+" - "+String.valueOf(histlen)+" -\n");
+                    if (mActivity.get().display.getLineCount()>5) mActivity.get().display.setText("");
+                    mActivity.get().display.append(formatter.toString()+" - "+String.valueOf(eventn)+" - "+String.valueOf(histlen)+"\n");
                     if (p>numsamples-2) {
                         _series0.resetData(series0);
                         _series1.resetData(series1);
@@ -308,6 +308,9 @@ public class MainActivity extends AppCompatActivity {
                         graph.getViewport().setMinY(-yscale*1.1/2.);
                         graph.getViewport().setMaxY(yscale*1.1/2.);
                         graph.getViewport().setYAxisBoundsManual(true);
+
+                        eventn++;//count the events
+                        send2usb(10); // get another event
                     }
 
                     break;
