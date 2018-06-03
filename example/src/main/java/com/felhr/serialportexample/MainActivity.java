@@ -65,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
     GraphView graph;
     private int numsamples = 70; // <256 please
     private int eventn = 0;
+    private int downsample = 3;
 
     private final ServiceConnection usbConnection = new ServiceConnection() {
         @Override
@@ -178,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
                         send2usb(122); send2usb(0); send2usb(numsamples); // samples per channel
 
                         send2usb(123); send2usb(0); // send increment
-                        send2usb(124); send2usb(3); // downsample 3
+                        send2usb(124); send2usb(downsample); // downsample 3
                         send2usb(125); send2usb(1); // tickstowait 1
 
                         //100, 10 // get event (or just 10 if auto-rearming)
@@ -206,6 +207,26 @@ public class MainActivity extends AppCompatActivity {
                         display.append("sent initialization commands \n");
                         waitalittle();
                         send2usb(10); // get an event
+                    }
+                    else if (data.equals("(")) {
+                        if (downsample<10) {
+                            downsample += 1;
+                            send2usb(124); send2usb(downsample);
+                            int ds=downsample-3;
+                            if (ds<1) ds=1;
+                            if (ds>8) ds=8; // otherwise we timeout upon readout
+                            send2usb(125);  send2usb(ds);
+                        }
+                    }
+                    else if (data.equals(")")) {
+                        if (downsample>0) {
+                            downsample -= 1;
+                            send2usb(124); send2usb(downsample);
+                            int ds=downsample-3;
+                            if (ds<1) ds=1;
+                            if (ds>8) ds=8; // otherwise we timeout upon readout
+                            send2usb(125);  send2usb(ds);
+                        }
                     }
                     else if (usbService != null) { // if UsbService was correctly bound, send data
                         display.append(data+"\n");
@@ -295,7 +316,7 @@ public class MainActivity extends AppCompatActivity {
                         else break;
                         p++;
                     }
-                    if (mActivity.get().display.getLineCount()>5) mActivity.get().display.setText("");
+                    if (mActivity.get().display.getLineCount()>3) mActivity.get().display.setText("");
                     mActivity.get().display.append(formatter.toString()+" - "+String.valueOf(eventn)+" - "+String.valueOf(histlen)+"\n");
                     if (p>numsamples-2) {
                         _series0.resetData(series0);

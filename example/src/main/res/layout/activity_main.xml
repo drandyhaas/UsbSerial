@@ -9,23 +9,14 @@
                 tools:context="com.felhr.serialportexample.MainActivity">
 
     <TextView
-        android:id="@+id/textViewTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true"
-        android:text="@string/serial_port"
-        android:textAppearance="?android:attr/textAppearanceLarge"/>
-
-    <TextView
         android:id="@+id/textView1"
         android:layout_width="match_parent"
-        android:layout_height="150dp"
+        android:layout_height="80dp"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="34dp"
         android:background="#FFFFFF"
-        android:scrollbars="vertical"
-        android:gravity="bottom" />
+        android:gravity="bottom"
+        android:scrollbars="vertical" />
 
     <EditText
         android:id="@+id/editText1"
@@ -47,8 +38,7 @@
         android:layout_width="wrap_content"
         android:layout_height="40dp"
         android:layout_alignEnd="@+id/textView1"
-        android:layout_alignParentTop="true"
-        android:layout_marginTop="218dp"
+        android:layout_alignTop="@+id/editText1"
         android:text="Send" />
 
     <com.jjoe64.graphview.GraphView
