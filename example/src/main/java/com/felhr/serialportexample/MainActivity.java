@@ -117,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
                         send2usb(0); send2usb(20); // board ID 0
                         send2usb(30); send2usb(142); // get board ID
                         waitalittle();
-                        send2usb(135); send2usb(2); send2usb(0); // serialdelaytimerwait of 512
+                        send2usb(135); send2usb(0); send2usb(100); // serialdelaytimerwait of 100
 
                         waitalittle(); send2usb(139); // auto-rearm trigger
                         send2usb(100);//final arming
@@ -218,26 +218,31 @@ public class MainActivity extends AppCompatActivity {
                 case UsbService.MESSAGE_FROM_SERIAL_PORT:
                     Formatter formatter = new Formatter();
                     byte [] bd = (byte[])msg.obj;
-                    int histlen=Math.min(numsamples,bd.length);
-                    DataPoint [] seriesd = new DataPoint[histlen-1];
+                    int histlen=bd.length/4;
+                    double xoffset = 1.0;
+                    DataPoint [] series0 = new DataPoint[histlen];
+                    DataPoint [] series1 = new DataPoint[histlen];
+                    DataPoint [] series2 = new DataPoint[histlen];
+                    DataPoint [] series3 = new DataPoint[histlen];
                     int p=0;
                     for (byte b : bd) {
                         formatter.format("%02x ", b);
-                        if (p>0) { // don't plot the first point - it's screwed up
-                            int bdp = bd[p];
-                            //convert to unsigned, then subtract 128
-                            if (bdp < 0) bdp += 256;
-                            bdp -= 128;
-                            seriesd[p-1] = new DataPoint(p, bdp);
-                        }
+                        int bdp = bd[p];
+                        //convert to unsigned, then subtract 128
+                        if (bdp < 0) bdp += 256;
+                        bdp -= 128;
+                        if (p<histlen) series0[p] = new DataPoint(p+xoffset, bdp);
+                        else if (p<2*histlen) series1[p-histlen] = new DataPoint(p-histlen+xoffset, bdp);
+                        else if (p<3*histlen) series2[p-2*histlen] = new DataPoint(p-2*histlen+xoffset, bdp);
+                        else if (p<4*histlen) series3[p-3*histlen] = new DataPoint(p-3*histlen+xoffset, bdp);
+                        else break;
                         p++;
-                        if (p>=histlen) break;
                     }
-                    mActivity.get().display.append(formatter.toString()+" -\n");
-                    series.resetData(seriesd);
+                    mActivity.get().display.append(formatter.toString()+" - "+String.valueOf(histlen)+" -\n");
                     if (p>numsamples-2) {
-                        graph.getViewport().setMinX(1);
-                        graph.getViewport().setMaxX(numsamples);
+                        series.resetData(series0);
+                        graph.getViewport().setMinX(xoffset);
+                        graph.getViewport().setMaxX(numsamples-1+xoffset);
                         graph.getViewport().setXAxisBoundsManual(true);
                     }
 
