@@ -59,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
     private MyHandler mHandler;
     LineGraphSeries<DataPoint> series;
     GraphView graph;
-    private int numsamples = 200; // <256 please
+    private int numsamples = 20; // <256 please
 
     private final ServiceConnection usbConnection = new ServiceConnection() {
         @Override
@@ -144,7 +144,12 @@ public class MainActivity extends AppCompatActivity {
                         waitalittle(); send2usb(131);  send2usb(6); send2usb(16); // spi offset binary output
                         //waitalittle(); send2usb(131);  send2usb(6); send2usb(80); // spi offset binary output - test pattern
                         waitalittle(); send2usb(131);  send2usb(1); send2usb(0 ); // spi not multiplexed output
-                        waitalittle(); send2usb(136); send2usb(3); send2usb(96); send2usb(80); send2usb(136); send2usb(22); send2usb(0); // board 0 calib
+
+                        waitalittle(); send2usb(136); send2usb(3); send2usb(96); send2usb(80); send2usb(136); send2usb(22); send2usb(0); // board 0 calib, chan 0
+                        waitalittle(); send2usb(136); send2usb(3); send2usb(96); send2usb(82); send2usb(135); send2usb(248); send2usb(0); // board 0 calib, chan 1
+                        waitalittle(); send2usb(136); send2usb(3); send2usb(96); send2usb(84); send2usb(136); send2usb(52); send2usb(0); // board 0 calib, chan 2
+                        waitalittle(); send2usb(136); send2usb(3); send2usb(96); send2usb(86); send2usb(136); send2usb(52); send2usb(0); // board 0 calib, chan 3
+
                         waitalittle();
                         display.append("sent initialization commands \n");
                     }
@@ -228,7 +233,7 @@ public class MainActivity extends AppCompatActivity {
                         p++;
                         if (p>=histlen) break;
                     }
-                    mActivity.get().display.append(formatter.toString()+"\n");
+                    mActivity.get().display.append(formatter.toString()+" -\n");
                     series.resetData(seriesd);
                     if (p>numsamples-2) {
                         graph.getViewport().setMinX(1);
