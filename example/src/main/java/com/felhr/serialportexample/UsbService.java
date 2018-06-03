@@ -58,9 +58,8 @@ public class UsbService extends Service {
     private UsbSerialInterface.UsbReadCallback mCallback = new UsbSerialInterface.UsbReadCallback() {
         @Override
         public void onReceivedData(byte[] arg0) {
-            byte [] data = arg0;
             if (mHandler != null) {
-                mHandler.obtainMessage(MESSAGE_FROM_SERIAL_PORT, data).sendToTarget();
+                mHandler.obtainMessage(MESSAGE_FROM_SERIAL_PORT, arg0).sendToTarget();
             }
         }
     };

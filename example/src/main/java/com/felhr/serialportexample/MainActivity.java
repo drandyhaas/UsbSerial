@@ -17,6 +17,10 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.jjoe64.graphview.GraphView;
+import com.jjoe64.graphview.series.DataPoint;
+import com.jjoe64.graphview.series.LineGraphSeries;
+
 import java.lang.ref.WeakReference;
 import java.math.BigInteger;
 import java.util.Formatter;
@@ -53,6 +57,10 @@ public class MainActivity extends AppCompatActivity {
     private TextView display;
     private EditText editText;
     private MyHandler mHandler;
+    LineGraphSeries<DataPoint> series;
+    GraphView graph;
+    private int numsamples = 250;
+
     private final ServiceConnection usbConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName arg0, IBinder arg1) {
@@ -66,10 +74,33 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    protected void waitalittle(){
+        try {
+            Thread.sleep(5);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void send2usb(int x){
+        if (x>127) x -= 256; // since it goes to bytes as twos compliment
+        usbService.write( BigInteger.valueOf(x).toByteArray() );
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        graph = (GraphView) findViewById(R.id.graph);
+        series = new LineGraphSeries<DataPoint>(new DataPoint[] {
+                new DataPoint(0, 1),
+                new DataPoint(1, 5),
+                new DataPoint(2, 3),
+                new DataPoint(3, 2),
+                new DataPoint(4, 6)
+        });
+        graph.addSeries(series);
 
         mHandler = new MyHandler(this);
 
@@ -79,13 +110,45 @@ public class MainActivity extends AppCompatActivity {
         sendButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (!editText.getText().toString().equals("")) {
-                    String data = editText.getText().toString();
-                    if (usbService != null) { // if UsbService was correctly binded, Send data
+                String data = editText.getText().toString();
+                if (!data.equals("")) {
+                    if (data.equals("I")){
+                        waitalittle();
+                        send2usb(0); send2usb(20); // board ID 0
+                        send2usb(30); send2usb(142); // get board ID
+                        waitalittle();
+                        send2usb(135); send2usb(1); send2usb(100); // serialdelaytimerwait of 200
+
+                        waitalittle(); send2usb(139); // auto-rearm trigger
+                        send2usb(100);//final arming
+
+                        //send2usb(122); send2usb(1); send2usb(0); // 256 samples per channel
+                        send2usb(122); send2usb(0); send2usb(numsamples); // samples per channel
+
+                        send2usb(123); send2usb(0); // send increment
+                        send2usb(124); send2usb(3); // downsample 3
+                        send2usb(125); send2usb(1); // tickstowait 1
+
+                        //100, 10 // get event (or just 10 if auto-rearming)
+                        //136, 2, 32, 0, 0, 255, 200 // io expanders on
+                        waitalittle(); send2usb(136); send2usb(2); send2usb(32); send2usb(1); send2usb(0); send2usb(255); send2usb(200);// io expanders on (!)
+                        //136, 2, 33, 0, 0, 255, 200 // io expanders on
+                        //136, 2, 33, 1, 0, 255, 200 // io expanders on
+                        //136, 2, 32, 18, 240, 255, 200 // init
+                        waitalittle(); send2usb(136); send2usb(2); send2usb(32); send2usb(19); send2usb(15); send2usb(255); send2usb(200);// init, and turn on ADCs!
+                        //136, 2, 33, 18, 0, 255, 200 // init
+                        //136, 2, 33, 19, 0, 255, 200 // init
+                        waitalittle(); send2usb(131);  send2usb(8); send2usb(0); // spi offset
+                        //waitalittle(); send2usb(131);  send2usb(6); send2usb(16); // spi offset binary output
+                        waitalittle(); send2usb(131);  send2usb(6); send2usb(80); // spi offset binary output - test pattern
+                        waitalittle(); send2usb(131);  send2usb(1); send2usb(0 ); // spi not multiplexed output
+                        waitalittle(); send2usb(136); send2usb(3); send2usb(96); send2usb(80); send2usb(136); send2usb(22); send2usb(0); // board 0 calib
+                        waitalittle();
+                        display.append("sent initialization commands \n");
+                    }
+                    else if (usbService != null) { // if UsbService was correctly binded, Send data
                         display.append(data+"\n");
-                        int x = Integer.parseInt(data);
-                        if (x>127) x -= 256; // since it goes to bytes as twos compliment
-                        usbService.write( BigInteger.valueOf(x).toByteArray() );
+                        send2usb(Integer.parseInt(data));
                     }
                 }
             }
@@ -135,7 +198,7 @@ public class MainActivity extends AppCompatActivity {
     /*
      * This handler will be passed to UsbService. Data received from serial port is displayed through this handler
      */
-    private static class MyHandler extends Handler {
+    private class MyHandler extends Handler {
         private final WeakReference<MainActivity> mActivity;
 
         public MyHandler(MainActivity activity) {
@@ -148,12 +211,29 @@ public class MainActivity extends AppCompatActivity {
                 case UsbService.MESSAGE_FROM_SERIAL_PORT:
                     Formatter formatter = new Formatter();
                     byte [] bd = (byte[])msg.obj;
+                    int histlen=Math.min(numsamples,bd.length);
+                    DataPoint [] seriesd = new DataPoint[histlen-1];
+                    int p=0;
                     for (byte b : bd) {
-                        formatter.format("%02x", b);
+                        formatter.format("%02x ", b);
+                        if (p>0) { // don't plot the first point - it's screwed up
+                            int bdp = bd[p];
+                            //convert to unsigned, then subtract 128
+                            if (bdp < 0) bdp += 256;
+                            bdp -= 128;
+                            seriesd[p-1] = new DataPoint(p, bdp);
+                        }
+                        p++;
+                        if (p>=histlen) break;
                     }
-                    String data = formatter.toString();
-                    if (data.length()>40) data = data.substring(0,40);
-                    mActivity.get().display.append(data+"\n");
+                    mActivity.get().display.append(formatter.toString()+"\n");
+                    series.resetData(seriesd);
+                    if (p>numsamples-2) {
+                        graph.getViewport().setMinX(1);
+                        graph.getViewport().setMaxX(numsamples);
+                        graph.getViewport().setXAxisBoundsManual(true);
+                    }
+
                     break;
                 case UsbService.CTS_CHANGE:
                     Toast.makeText(mActivity.get(), "CTS_CHANGE",Toast.LENGTH_LONG).show();
