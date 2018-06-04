@@ -24,6 +24,7 @@ import com.jjoe64.graphview.series.LineGraphSeries;
 
 import java.lang.ref.WeakReference;
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 import java.util.Formatter;
 import java.util.Set;
 
@@ -54,18 +55,22 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
-    private UsbService usbService;
-    private TextView display;
-    private EditText editText;
-    private MyHandler mHandler;
-    LineGraphSeries<DataPoint> _series0;
-    LineGraphSeries<DataPoint> _series1;
-    LineGraphSeries<DataPoint> _series2;
-    LineGraphSeries<DataPoint> _series3;
-    GraphView graph;
-    private int numsamples = 250; // <256 please
+    protected UsbService usbService;
+    protected TextView display;
+    protected EditText editText;
+    protected MyHandler mHandler;
+    protected LineGraphSeries<DataPoint> _series0;
+    protected LineGraphSeries<DataPoint> _series1;
+    protected LineGraphSeries<DataPoint> _series2;
+    protected LineGraphSeries<DataPoint> _series3;
+    protected GraphView graph;
+    private int numsamples = 200; // <256 please
     private int eventn = 0;
     private int downsample = 3;
+    private boolean autogo = true;
+    private ByteBuffer myserialBuffer; // for syncronizing serial data
+    private String myboardid = "";
+    private boolean synced = false;
 
     private final ServiceConnection usbConnection = new ServiceConnection() {
         @Override
@@ -156,6 +161,7 @@ public class MainActivity extends AppCompatActivity {
         graph.addSeries(_series3);
 
         mHandler = new MyHandler(this);
+        myserialBuffer= ByteBuffer.allocateDirect(numsamples*4*2);//for good luck
 
         display = (TextView) findViewById(R.id.textView1);
         editText = (EditText) findViewById(R.id.editText1);
@@ -170,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
                         send2usb(0); send2usb(20); // board ID 0
                         send2usb(30); send2usb(142); // get board ID
                         waitalittle();
-                        send2usb(135); send2usb(0); send2usb(100); // serialdelaytimerwait of 100
+                        send2usb(135); send2usb(3); send2usb(100); // serialdelaytimerwait
 
                         waitalittle(); send2usb(139); // auto-rearm trigger
                         send2usb(100);//final arming
@@ -205,8 +211,11 @@ public class MainActivity extends AppCompatActivity {
 
                         waitalittle();
                         display.append("sent initialization commands \n");
-                        waitalittle();
-                        send2usb(10); // get an event
+
+                        if (autogo) {
+                            waitalittle();
+                            send2usb(10); // get an event
+                        }
                     }
                     else if (data.equals("(")) {
                         if (downsample<10) {
@@ -277,6 +286,56 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(mUsbReceiver, filter);
     }
 
+    private String processdata(byte [] bd){
+        //Formatter formatter = new Formatter();
+        int histlen=bd.length/4;
+        double xoffset = 1.0;
+        int yoffset=0;
+        double yscale = 7.5;
+        DataPoint [] series0 = new DataPoint[histlen];
+        DataPoint [] series1 = new DataPoint[histlen];
+        DataPoint [] series2 = new DataPoint[histlen];
+        DataPoint [] series3 = new DataPoint[histlen];
+        int p=0;
+        for (byte b : bd) {
+            //formatter.format("%02x ", b); // for debugging
+            int bdp = bd[p];
+            //convert to unsigned, then subtract 128
+            if (bdp < 0) bdp += 256;
+            bdp -= 128;
+            double yval=(yoffset-bdp)*(yscale/256.); // got to flip it, since it's a negative feedback op amp
+            if (p<histlen) series0[p] = new DataPoint(p+xoffset, yval);
+            else if (p<2*histlen) series1[p-histlen] = new DataPoint(p-histlen+xoffset, yval);
+            else if (p<3*histlen) series2[p-2*histlen] = new DataPoint(p-2*histlen+xoffset, yval);
+            else if (p<4*histlen) series3[p-3*histlen] = new DataPoint(p-3*histlen+xoffset, yval);
+            else break;
+            p++;
+        }
+        if (p>numsamples-2) {
+            _series0.resetData(series0);
+            _series1.resetData(series1);
+            _series2.resetData(series2);
+            _series3.resetData(series3);
+            graph.getViewport().setMinX(xoffset);
+            graph.getViewport().setMaxX(numsamples-1+xoffset);
+            graph.getViewport().setXAxisBoundsManual(true);
+            graph.getViewport().setMinY(-yscale*1.1/2.);
+            graph.getViewport().setMaxY(yscale*1.1/2.);
+            graph.getViewport().setYAxisBoundsManual(true);
+
+            eventn++;//count the events
+            if (autogo) send2usb(10); // get another event
+        }
+        return ""; //formatter.toString();
+    }
+
+    public static String byteArrayToHex(byte[] a) {
+        StringBuilder sb = new StringBuilder(a.length * 2);
+        for(byte b: a)
+            sb.append(String.format("%02x", b));
+        return sb.toString();
+    }
+
     /*
      * This handler will be passed to UsbService. Data received from serial port is displayed through this handler
      */
@@ -291,48 +350,54 @@ public class MainActivity extends AppCompatActivity {
         public void handleMessage(Message msg) {
             switch (msg.what) {
                 case UsbService.MESSAGE_FROM_SERIAL_PORT:
-                    Formatter formatter = new Formatter();
                     byte [] bd = (byte[])msg.obj;
-                    int histlen=bd.length/4;
-                    double xoffset = 1.0;
-                    int yoffset=0;
-                    double yscale = 7.5;
-                    DataPoint [] series0 = new DataPoint[histlen];
-                    DataPoint [] series1 = new DataPoint[histlen];
-                    DataPoint [] series2 = new DataPoint[histlen];
-                    DataPoint [] series3 = new DataPoint[histlen];
-                    int p=0;
-                    for (byte b : bd) {
-                        //formatter.format("%02x ", b); // for debugging
-                        int bdp = bd[p];
-                        //convert to unsigned, then subtract 128
-                        if (bdp < 0) bdp += 256;
-                        bdp -= 128;
-                        double yval=(yoffset-bdp)*(yscale/256.); // got to flip it, since it's a negative feedback op amp
-                        if (p<histlen) series0[p] = new DataPoint(p+xoffset, yval);
-                        else if (p<2*histlen) series1[p-histlen] = new DataPoint(p-histlen+xoffset, yval);
-                        else if (p<3*histlen) series2[p-2*histlen] = new DataPoint(p-2*histlen+xoffset, yval);
-                        else if (p<4*histlen) series3[p-3*histlen] = new DataPoint(p-3*histlen+xoffset, yval);
-                        else break;
-                        p++;
-                    }
-                    if (mActivity.get().display.getLineCount()>3) mActivity.get().display.setText("");
-                    mActivity.get().display.append(formatter.toString()+" - "+String.valueOf(eventn)+" - "+String.valueOf(histlen)+"\n");
-                    if (p>numsamples-2) {
-                        _series0.resetData(series0);
-                        _series1.resetData(series1);
-                        _series2.resetData(series2);
-                        _series3.resetData(series3);
-                        graph.getViewport().setMinX(xoffset);
-                        graph.getViewport().setMaxX(numsamples-1+xoffset);
-                        graph.getViewport().setXAxisBoundsManual(true);
-                        graph.getViewport().setMinY(-yscale*1.1/2.);
-                        graph.getViewport().setMaxY(yscale*1.1/2.);
-                        graph.getViewport().setYAxisBoundsManual(true);
 
-                        eventn++;//count the events
-                        send2usb(10); // get another event
+                    if (8==bd.length) {
+                        //get the board id and save it, from the initial 142 call probably
+                        if (myboardid.isEmpty()) {
+                            myboardid = byteArrayToHex(bd);
+                            mActivity.get().display.append("myboardid = " + myboardid+"\n");
+                            synced = true;
+                        } else if (byteArrayToHex(bd).equals(myboardid)) {
+                            synced = true; // if we got a matching board id, we're synced up
+                            if (autogo) send2usb(10);//get another event
+                        }
+                        else synced=false;
+                        myserialBuffer.position(0);
+                        myserialBuffer.clear();
+                        mActivity.get().display.append("synced now "+String.valueOf(synced)+" - "+String.valueOf(eventn)+"\n");
                     }
+                    else{
+                        //deal with other sized packet
+                        myserialBuffer.put(bd); // TODO: make sure we have enough room in the buffer
+                    }
+
+                    //if (bd.length!=numsamples) mActivity.get().display.append("was"+String.valueOf(myserialBuffer.position())+" - "+String.valueOf(eventn)+" - "+String.valueOf(bd.length)+"\n");
+
+                    //make sure we have the expected number of bytes
+                    //check via a call to get board id to make sure we know where we are in the serial stream
+                    String res="";
+                    if (synced && myserialBuffer.position()==numsamples*4) {//good!
+                        byte[] dst = new byte[myserialBuffer.position()];
+                        myserialBuffer.position(0);
+                        myserialBuffer.get(dst, 0, dst.length);
+                        myserialBuffer.clear();
+                        res = processdata(dst);
+                    }
+                    else if (myserialBuffer.position()>numsamples*4 || myserialBuffer.position()%numsamples!=0) {//oops, we got too much data or a weird amount? better resync!
+                        myserialBuffer.position(0);
+                        myserialBuffer.clear();
+                        synced=false;
+                    }
+                    if (!synced){
+                        myserialBuffer.position(0);
+                        myserialBuffer.clear();
+                        send2usb(142);//request the board ID
+                    }
+
+                    //if (bd.length!=numsamples) mActivity.get().display.append("now"+String.valueOf(myserialBuffer.position())+" - "+String.valueOf(eventn)+" - "+String.valueOf(bd.length)+"\n");
+                    //if (mActivity.get().display.getLineCount()>3) mActivity.get().display.setText("");
+                    if (bd.length!=numsamples) mActivity.get().display.append(res +" - "+String.valueOf(eventn)+" - "+String.valueOf(bd.length)+"\n");
 
                     break;
                 case UsbService.CTS_CHANGE:
