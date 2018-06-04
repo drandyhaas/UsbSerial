@@ -119,7 +119,7 @@ public class CH34xSerialDevice extends UsbSerialDevice
             requestIN = new UsbRequest();
             requestIN.initialize(connection, inEndpoint);
 
-            // Restart the working thread if it has been killed before and  get and claim interface
+            // Restart the working thread if it has been killed before and get and claim interface
             restartWorkingThread();
             restartWriteThread();
 
@@ -370,7 +370,7 @@ public class CH34xSerialDevice extends UsbSerialDevice
     {
         if(connection.claimInterface(mInterface, true))
         {
-            Log.i(CLASS_ID, "Interface succesfully claimed");
+            Log.i(CLASS_ID, "Interface successfully claimed");
         }else
         {
             Log.i(CLASS_ID, "Interface could not be claimed");
