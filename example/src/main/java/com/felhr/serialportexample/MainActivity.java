@@ -63,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
     LineGraphSeries<DataPoint> _series2;
     LineGraphSeries<DataPoint> _series3;
     GraphView graph;
-    private int numsamples = 70; // <256 please
+    private int numsamples = 250; // <256 please
     private int eventn = 0;
     private int downsample = 3;
 
