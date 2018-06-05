@@ -241,11 +241,6 @@ public class CH34xSerialDevice extends UsbSerialDevice
             if(ret == -1)
                 Log.i(CLASS_ID, "SetBaudRate failed!");
         }
-        else if (baudRate>921600){
-            int ret = setBaudRateLinux(baudRate);
-            if(ret == -1)
-                Log.i(CLASS_ID, "SetBaudRate failed!");
-        }
     }
 
     @Override
@@ -469,41 +464,6 @@ public class CH34xSerialDevice extends UsbSerialDevice
             return -1;
         if(setControlCommandOut(CH341_REQ_WRITE_REG, 0x2727, 0, null) < 0)
             return -1;
-        return 0;
-    }
-
-    private int setBaudRateLinux(int baud)
-    {
-        // ported from linux driver: https://github.com/Ozzadar/CH341SER_LINUX/blob/master/ch34x.c
-
-        long a, b;
-        int r;
-        long factor;
-        short divisor;
-
-        factor = (1532620800 / baud);
-        divisor = 3;
-
-        while ((factor > 0xfff0) && divisor>0) {
-            factor >>= 3;
-            divisor--;
-        }
-
-        if (factor > 0xfff0)
-            return -1;
-
-        factor = 0x10000 - factor;
-        a = (factor & 0xff00) | divisor;
-        b = factor & 0xff;
-
-        //r = ch341_control_out(dev, 0x9a, 0x1312, a);
-        if(setControlCommandOut(CH341_REQ_WRITE_REG, 0x1312, (int)a, null) < 0)
-            return -1;
-
-        //r = ch341_control_out(dev, 0x9a, 0x0f2c, b);
-        if(setControlCommandOut(CH341_REQ_WRITE_REG, 0x0f2c, (int)b, null) < 0)
-            return -1;
-
         return 0;
     }
 

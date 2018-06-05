@@ -85,6 +85,55 @@ public class UsbService extends Service {
                 mHandler.obtainMessage(DSR_CHANGE).sendToTarget();
         }
     };
+
+    private static final int CH341_REQ_WRITE_REG = 0x9A;
+    private static final int REQTYPE_HOST_TO_DEVICE = 0x40;
+    protected static final int USB_TIMEOUT = 5000;
+
+    // for setting the baud rate >921600
+    private int setBaudRateLinux(int baud)
+    {
+        // ported from linux driver: https://github.com/Ozzadar/CH341SER_LINUX/blob/master/ch34x.c
+
+        long a, b;
+        int r;
+        long factor;
+        short divisor;
+
+        factor = (1532620800 / baud);
+        divisor = 3;
+
+        while ((factor > 0xfff0) && divisor>0) {
+            factor >>= 3;
+            divisor--;
+        }
+
+        if (factor > 0xfff0)
+            return -1;
+
+        factor = 0x10000 - factor;
+        a = (factor & 0xff00) | divisor;
+        b = factor & 0xff;
+
+        //r = ch341_control_out(dev, 0x9a, 0x1312, a);
+        if(setControlCommandOut(CH341_REQ_WRITE_REG, 0x1312, (int)a, null) < 0)
+            return -1;
+
+        //r = ch341_control_out(dev, 0x9a, 0x0f2c, b);
+        if(setControlCommandOut(CH341_REQ_WRITE_REG, 0x0f2c, (int)b, null) < 0)
+            return -1;
+
+        return 0;
+    }
+
+    private int setControlCommandOut(int request, int value, int index, byte[] data)
+    {
+        int dataLength = 0;
+        if(data != null) dataLength = data.length;
+        int response = connection.controlTransfer(REQTYPE_HOST_TO_DEVICE, request, value, index, data, dataLength, USB_TIMEOUT);
+        return response;
+    }
+
     /*
      * Different notifications from OS will be received here (USB attached, detached, permission responses...)
      * About BroadcastReceiver: http://developer.android.com/reference/android/content/BroadcastReceiver.html
@@ -234,7 +283,8 @@ public class UsbService extends Service {
             if (serialPort != null) {
                 if (serialPort.open()) {
                     serialPortConnected = true;
-                    serialPort.setBaudRate(BAUD_RATE);
+                    if (BAUD_RATE>921600) setBaudRateLinux(BAUD_RATE); // ACH
+                    else serialPort.setBaudRate(BAUD_RATE);
                     serialPort.setDataBits(UsbSerialInterface.DATA_BITS_8);
                     serialPort.setStopBits(UsbSerialInterface.STOP_BITS_1);
                     serialPort.setParity(UsbSerialInterface.PARITY_NONE);
